@@ -9,12 +9,13 @@ import {
   TouchableOpacity
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAppTheme } from '../../theme';
+import { useAppTheme, Theme } from '../../theme';
 import { useTranslation } from '../../theme/i18n';
 import { useAnalytics } from '../../hooks/useAnalytics';
 import { PieChart as PieIcon, TrendingUp } from 'lucide-react-native';
 import Svg, { G, Circle, Rect } from 'react-native-svg';
 import { format, startOfDay, startOfWeek, startOfMonth, startOfQuarter, startOfYear, subMonths } from 'date-fns';
+import { useIsFocused } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
 type Period = 'Day' | 'Week' | 'Month' | 'Quarter' | 'Half-year' | 'Year';
@@ -22,6 +23,7 @@ type Period = 'Day' | 'Week' | 'Month' | 'Quarter' | 'Half-year' | 'Year';
 export const AnalyticsScreen = () => {
   const { t, currency } = useTranslation();
   const theme = useAppTheme();
+  const isFocused = useIsFocused();
   const [period, setPeriod] = useState<Period>('Month');
 
   const dateRange = useMemo(() => {
@@ -41,10 +43,20 @@ export const AnalyticsScreen = () => {
 
   const { useDashboard, useLongTerm, useExpensesByCategory, useTrends } = useAnalytics();
   
-  const { data: dashboard, isLoading: dashLoading } = useDashboard();
-  const { data: longTerm, isLoading: longLoading } = useLongTerm();
-  const { data: expenseResponse, isLoading: expensesLoading } = useExpensesByCategory(dateRange);
-  const { data: trends } = useTrends({ period: period === 'Year' ? 'year' : 'month' });
+  const { data: dashboard, refetch: refetchDash } = useDashboard();
+  const { data: longTerm, refetch: refetchLong } = useLongTerm();
+  const { data: expenseResponse, isLoading: expensesLoading, refetch: refetchExpenses } = useExpensesByCategory(dateRange);
+  const { data: trends, refetch: refetchTrends } = useTrends({ period: period === 'Year' ? 'year' : 'month' });
+
+  // Оновлюємо дані при фокусі на екрані або зміні періоду
+  useEffect(() => {
+    if (isFocused) {
+      refetchDash();
+      refetchLong();
+      refetchExpenses();
+      refetchTrends();
+    }
+  }, [isFocused, period, dateRange]);
 
   const currentSpending = useMemo(() => {
     let val = 0;
@@ -79,6 +91,12 @@ export const AnalyticsScreen = () => {
       };
     });
   }, [expenseResponse]);
+
+  const categoryColorMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    donutData.forEach(d => { map[d.category] = d.color; });
+    return map;
+  }, [donutData]);
 
   const styles = createStyles(theme);
 
@@ -120,9 +138,9 @@ export const AnalyticsScreen = () => {
   const renderTrends = () => {
     if (!trends || !Array.isArray(trends) || trends.length === 0) return null;
 
-    const chartHeight = 100;
-    const barWidth = 30;
-    const gap = 15;
+    const chartHeight = 120;
+    const barWidth = 24;
+    const gap = 12;
     const chartWidth = Math.max(width - 80, trends.length * (barWidth + gap));
     const maxVal = Math.max(...trends.map(t => Number(t.total) || 0), 1);
 
@@ -136,18 +154,39 @@ export const AnalyticsScreen = () => {
           <View>
             <Svg width={chartWidth} height={chartHeight}>
               {trends.map((item, index) => {
-                const val = Number(item.total) || 0;
-                const h = (val / maxVal) * (chartHeight - 20);
                 const x = index * (barWidth + gap);
+                const totalVal = Number(item.total) || 0;
+                const totalH = (totalVal / maxVal) * (chartHeight - 30);
+                
+                if (item.breakdown && item.breakdown.length > 0) {
+                  let currentY = chartHeight - 20;
+                  return item.breakdown.map((b, bIdx) => {
+                    const segmentH = (Number(b.total) / totalVal) * totalH;
+                    const segmentY = currentY - segmentH;
+                    currentY = segmentY;
+                    return (
+                      <Rect
+                        key={`${index}-${bIdx}`}
+                        x={x}
+                        y={segmentY}
+                        width={barWidth}
+                        height={segmentH}
+                        fill={categoryColorMap[b.category] || theme.colors.primary}
+                        rx={bIdx === item.breakdown!.length - 1 ? 4 : 0}
+                      />
+                    );
+                  });
+                }
+
                 return (
                   <Rect
                     key={index}
                     x={x}
-                    y={chartHeight - h - 20}
+                    y={chartHeight - totalH - 20}
                     width={barWidth}
-                    height={h}
+                    height={totalH}
                     fill={theme.colors.primary}
-                    rx={6}
+                    rx={4}
                     opacity={0.8}
                   />
                 );
@@ -171,14 +210,6 @@ export const AnalyticsScreen = () => {
   };
 
   const periods: Period[] = ['Day', 'Week', 'Month', 'Quarter', 'Half-year', 'Year'];
-
-  if (dashLoading || longLoading) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-      </View>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -258,7 +289,7 @@ export const AnalyticsScreen = () => {
   );
 };
 
-const createStyles = (theme: any) => StyleSheet.create({
+const createStyles = (theme: Theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.colors.background },
   header: { backgroundColor: theme.colors.card, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: theme.colors.border },
   title: { fontSize: 28, fontWeight: '800', paddingHorizontal: 20, marginBottom: 16, color: theme.colors.text },

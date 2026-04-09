@@ -70,20 +70,21 @@ export const AnalyticsScreen = () => {
     return Number(val);
   }, [period, dashboard, longTerm]);
 
+  const categoriesData = expenseResponse?.categories || [];
+
   const donutData = useMemo(() => {
-    const expenses = expenseResponse?.categories;
-    if (!expenses || !Array.isArray(expenses) || expenses.length === 0) return [];
+    if (!categoriesData || categoriesData.length === 0) return [];
     
     const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
     let cumulativePercent = 0;
 
-    return expenses.map((item, index) => {
+    return categoriesData.map((item, index) => {
       const percent = Number(item.percentage) || 0;
       const startPercent = cumulativePercent;
       cumulativePercent += percent;
       return { ...item, percent, startPercent, color: colors[index % colors.length] };
     });
-  }, [expenseResponse]);
+  }, [expenseResponse, categoriesData]);
 
   const categoryColorMap = useMemo(() => {
     const map: Record<string, string> = {};
@@ -198,7 +199,7 @@ export const AnalyticsScreen = () => {
               <PieIcon size={48} color={theme.colors.border} />
               <Text style={styles.emptyText}>{t('noData')}</Text>
               <Text style={{ fontSize: 10, color: theme.colors.textSecondary, marginTop: 8, opacity: 0.5 }}>
-                Debug: {dateRange.startDate} - {dateRange.endDate}
+                Count: {categoriesData.length} | Range: {dateRange.startDate} - {dateRange.endDate}
               </Text>
             </View>
           )}

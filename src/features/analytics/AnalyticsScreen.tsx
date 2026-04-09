@@ -31,7 +31,7 @@ export const AnalyticsScreen = () => {
     let startDate: Date;
     switch (period) {
       case 'Day': startDate = startOfDay(now); break;
-      case 'Week': startDate = startOfWeek(now); break;
+      case 'Week': startDate = startOfWeek(now, { weekStartsOn: 1 }); break;
       case 'Month': startDate = startOfMonth(now); break;
       case 'Quarter': startDate = startOfQuarter(now); break;
       case 'Half-year': startDate = subMonths(now, 6); break;
@@ -48,7 +48,6 @@ export const AnalyticsScreen = () => {
   const { data: expenseResponse, isLoading: expensesLoading, refetch: refetchExpenses } = useExpensesByCategory(dateRange);
   const { data: trends, refetch: refetchTrends } = useTrends({ period: period === 'Year' ? 'year' : 'month' });
 
-  // Оновлюємо дані при фокусі на екрані або зміні періоду
   useEffect(() => {
     if (isFocused) {
       refetchDash();
@@ -82,13 +81,7 @@ export const AnalyticsScreen = () => {
       const percent = Number(item.percentage) || 0;
       const startPercent = cumulativePercent;
       cumulativePercent += percent;
-      
-      return {
-        ...item,
-        percent,
-        startPercent,
-        color: colors[index % colors.length]
-      };
+      return { ...item, percent, startPercent, color: colors[index % colors.length] };
     });
   }, [expenseResponse]);
 
@@ -105,25 +98,13 @@ export const AnalyticsScreen = () => {
     const strokeWidth = 20;
     const radius = (size - strokeWidth) / 2;
     const circumference = 2 * Math.PI * radius;
-
     if (donutData.length === 0) return null;
-
     return (
       <View style={styles.chartWrapper}>
         <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
           <G rotation="-90" origin={`${size/2}, ${size/2}`}>
             {donutData.map((item, index) => (
-              <Circle
-                key={index}
-                cx={size / 2}
-                cy={size / 2}
-                r={radius}
-                stroke={item.color}
-                strokeWidth={strokeWidth}
-                strokeDasharray={`${(item.percent * circumference) / 100} ${circumference}`}
-                strokeDashoffset={`${-(item.startPercent * circumference) / 100}`}
-                fill="transparent"
-              />
+              <Circle key={index} cx={size / 2} cy={size / 2} r={radius} stroke={item.color} strokeWidth={strokeWidth} strokeDasharray={`${(item.percent * circumference) / 100} ${circumference}`} strokeDashoffset={`${-(item.startPercent * circumference) / 100}`} fill="transparent" />
             ))}
           </G>
         </Svg>
@@ -137,13 +118,11 @@ export const AnalyticsScreen = () => {
 
   const renderTrends = () => {
     if (!trends || !Array.isArray(trends) || trends.length === 0) return null;
-
     const chartHeight = 120;
     const barWidth = 24;
     const gap = 12;
     const chartWidth = Math.max(width - 80, trends.length * (barWidth + gap));
     const maxVal = Math.max(...trends.map(t => Number(t.total) || 0), 1);
-
     return (
       <View style={styles.trendsContainer}>
         <View style={styles.trendsHeader}>
@@ -157,50 +136,23 @@ export const AnalyticsScreen = () => {
                 const x = index * (barWidth + gap);
                 const totalVal = Number(item.total) || 0;
                 const totalH = (totalVal / maxVal) * (chartHeight - 30);
-                
                 if (item.breakdown && item.breakdown.length > 0) {
                   let currentY = chartHeight - 20;
                   return item.breakdown.map((b, bIdx) => {
                     const segmentH = (Number(b.total) / totalVal) * totalH;
                     const segmentY = currentY - segmentH;
                     currentY = segmentY;
-                    return (
-                      <Rect
-                        key={`${index}-${bIdx}`}
-                        x={x}
-                        y={segmentY}
-                        width={barWidth}
-                        height={segmentH}
-                        fill={categoryColorMap[b.category] || theme.colors.primary}
-                        rx={bIdx === item.breakdown!.length - 1 ? 4 : 0}
-                      />
-                    );
+                    return <Rect key={`${index}-${bIdx}`} x={x} y={segmentY} width={barWidth} height={segmentH} fill={categoryColorMap[b.category] || theme.colors.primary} rx={bIdx === item.breakdown!.length - 1 ? 4 : 0} />;
                   });
                 }
-
-                return (
-                  <Rect
-                    key={index}
-                    x={x}
-                    y={chartHeight - totalH - 20}
-                    width={barWidth}
-                    height={totalH}
-                    fill={theme.colors.primary}
-                    rx={4}
-                    opacity={0.8}
-                  />
-                );
+                return <Rect key={index} x={x} y={chartHeight - totalH - 20} width={barWidth} height={totalH} fill={theme.colors.primary} rx={4} opacity={0.8} />;
               })}
             </Svg>
             <View style={{ flexDirection: 'row', width: chartWidth }}>
               {trends.map((item, index) => {
                 const parts = item.date.split('-');
                 const label = period === 'Year' ? parts[1] : parts[2] || parts[0];
-                return (
-                  <Text key={index} style={[styles.trendLabel, { width: barWidth, marginLeft: index === 0 ? 0 : gap }]}>
-                    {label}
-                  </Text>
-                );
+                return <Text key={index} style={[styles.trendLabel, { width: barWidth, marginLeft: index === 0 ? 0 : gap }]}>{label}</Text>;
               })}
             </View>
           </View>
@@ -217,11 +169,7 @@ export const AnalyticsScreen = () => {
         <Text style={styles.title}>{t('analytics')}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.periodSelector}>
           {periods.map((p) => (
-            <TouchableOpacity 
-              key={p} 
-              style={[styles.periodButton, period === p && styles.activePeriodButton]}
-              onPress={() => setPeriod(p)}
-            >
+            <TouchableOpacity key={p} style={[styles.periodButton, period === p && styles.activePeriodButton]} onPress={() => setPeriod(p)}>
               <Text style={[styles.periodText, period === p && styles.activePeriodText]}>{t(p.toLowerCase())}</Text>
             </TouchableOpacity>
           ))}
@@ -232,7 +180,7 @@ export const AnalyticsScreen = () => {
         <View style={styles.mainCard}>
           {expensesLoading ? (
             <ActivityIndicator size="large" color={theme.colors.primary} style={{ padding: 40 }} />
-          ) : donutData.length > 0 ? (
+          ) : (donutData.length > 0) ? (
             <>
               {renderDonut()}
               <View style={styles.legendGrid}>
@@ -249,6 +197,9 @@ export const AnalyticsScreen = () => {
             <View style={styles.emptyContainer}>
               <PieIcon size={48} color={theme.colors.border} />
               <Text style={styles.emptyText}>{t('noData')}</Text>
+              <Text style={{ fontSize: 10, color: theme.colors.textSecondary, marginTop: 8, opacity: 0.5 }}>
+                Debug: {dateRange.startDate} - {dateRange.endDate}
+              </Text>
             </View>
           )}
         </View>
@@ -269,15 +220,7 @@ export const AnalyticsScreen = () => {
                     <Text style={styles.barValue}>{currency}{Number(item.total).toLocaleString()}</Text>
                   </View>
                   <View style={styles.barBackground}>
-                    <View 
-                      style={[
-                        styles.barFill, 
-                        { 
-                          width: `${item.percent}%`,
-                          backgroundColor: item.color
-                        }
-                      ]} 
-                    />
+                    <View style={[styles.barFill, { width: `${item.percent}%`, backgroundColor: item.color }]} />
                   </View>
                 </View>
               ))}

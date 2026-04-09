@@ -3,7 +3,9 @@ import { ExpensesByCategoryResponse, DashboardStats, LongTermStats, TrendData } 
 
 export const analyticsController = {
   getExpensesByCategory: async (params?: { startDate?: string; endDate?: string }): Promise<ExpensesByCategoryResponse> => {
+    console.log('API: getExpensesByCategory', params);
     const response = await apiClient.get('/analytics/expenses-by-category', { params });
+    console.log('API Result: expenses count:', response.data?.categories?.length);
     return response.data;
   },
 
